@@ -1,0 +1,25 @@
+[project]
+name = "azure-file-manager"
+version = "0.1.0"
+description = "A streamlined Python application for managing files in Azure Blob Storage with browser-based authentication"
+requires-python = ">=3.8"
+dependencies = [
+    "azure-identity==1.19.0",
+    "azure-storage-blob==12.24.0",
+    "python-dotenv==1.0.1",
+    "pandas>=2.0.0",
+]
+
+[project.scripts]
+azure-file-manager = "azure_file_manager:main"
+azure-df = "dfinsidefolder:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

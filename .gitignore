@@ -7,6 +7,8 @@ __pycache__/
 env/
 venv/
 ENV/
+superman/
+.venv/
 build/
 develop-eggs/
 dist/
@@ -25,6 +27,10 @@ wheels/
 
 # Environment variables
 .env
+
+# uv
+.python-version
+uv.lock
 
 # Downloads directory
 downloads/

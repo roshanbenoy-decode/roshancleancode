@@ -8,7 +8,17 @@ A streamlined Python application for managing files in the `30-projects` Azure B
 
 ## Commands
 
-### Setup
+### Setup (using uv - recommended)
+- Install uv: `pip install uv` (if not already installed)
+- Create virtual environment: `uv venv superman` (or use existing `superman` venv)
+- Activate virtual environment:
+  - Windows: `superman\Scripts\activate`
+  - Unix/MacOS: `source superman/bin/activate`
+- Install dependencies: `uv sync` or `uv pip install -e .`
+- Configure environment: Copy `.env.example` to `.env` and set your storage account name
+- Ensure the `30-projects` container exists in your Azure Storage account
+
+### Setup (traditional pip)
 - Install dependencies: `pip install -r requirements.txt`
 - Configure environment: Copy `.env.example` to `.env` and set your storage account name
 - Ensure the `30-projects` container exists in your Azure Storage account
