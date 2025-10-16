@@ -98,3 +98,49 @@ This is a simple CLI application that uses Azure SDK for Python to interact with
 2. User authenticates with Microsoft/Azure account
 3. Token stored by Azure SDK for subsequent requests
 4. Requires Storage Blob Data Contributor role or similar permissions on `30-projects` container
+
+## Output File Guidelines
+
+**IMPORTANT**: When creating scripts that generate output files (CSV, HTML, Excel, JSON, etc.), Claude should ALWAYS follow these guidelines:
+
+### Default Output Location
+- **Default directory**: `downloads/` folder
+- All generated output files should be saved to the `downloads/` directory by default
+- The downloads folder is already created and used by the Azure File Manager application
+
+### User Prompts for Output Location
+- **Always ask the user** where they want to save output files
+- Provide a clear prompt with the default option
+- Example prompt format:
+  ```python
+  output_dir = input("Enter output directory (press Enter for default 'downloads'): ").strip()
+  if not output_dir:
+      output_dir = 'downloads'
+  ```
+
+### Best Practices
+1. Use `os.path.join()` for cross-platform compatible file paths
+2. Create the output directory if it doesn't exist using `os.makedirs(output_dir, exist_ok=True)`
+3. Always import `os` module when handling file paths and directories
+4. Display the full output path to the user after they make their selection
+5. Use descriptive filenames with timestamps when appropriate (e.g., `report_20251016_101700.html`)
+
+### Example Implementation
+```python
+import os
+from datetime import datetime
+
+# Ask user for output location
+output_dir = input("Enter output directory (press Enter for default 'downloads'): ").strip()
+if not output_dir:
+    output_dir = 'downloads'
+
+# Create directory if needed
+os.makedirs(output_dir, exist_ok=True)
+
+# Build file path
+output_file = os.path.join(output_dir, 'my_report.html')
+print(f"Output will be saved to: {output_file}")
+```
+
+This ensures consistency across all scripts and gives users control over where their files are saved while maintaining a sensible default.

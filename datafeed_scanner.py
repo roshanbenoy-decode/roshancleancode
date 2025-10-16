@@ -2,7 +2,7 @@
 Datafeed Scanner - Scan Azure Blob Storage for Datafeed folders and extract metadata.
 
 This script searches through the '30-projects' container for folders named 'Datafeed',
-analyzes Excel files (DImmanager.xlsx) and Parquet files within them, and exports
+analyzes Excel files (DimManager.xlsx) and Parquet files within them, and exports
 metadata (table names and column names) to a CSV report.
 """
 
@@ -23,7 +23,7 @@ class DatafeedScanner:
     """Scans Azure Blob Storage for Datafeed folders and extracts metadata."""
 
     CONTAINER_NAME = "30-projects"
-    EXCEL_FILENAME = "DImmanager.xlsx"
+    EXCEL_FILENAME = "DimManager.xlsx"
 
     def __init__(self):
         """Initialize the Datafeed Scanner with browser authentication."""
@@ -133,7 +133,7 @@ class DatafeedScanner:
                 # Get filename
                 filename = blob.name.split('/')[-1]
 
-                # Check for DImmanager.xlsx
+                # Check for DimManager.xlsx
                 if filename.lower() == self.EXCEL_FILENAME.lower():
                     files['excel'] = blob.name
 
@@ -195,7 +195,7 @@ class DatafeedScanner:
             # Read Excel file
             excel_file = pd.ExcelFile(excel_path, engine='openpyxl')
 
-            print(f"  ✓ Found {len(excel_file.sheet_names)} sheet(s) in DImmanager.xlsx")
+            print(f"  ✓ Found {len(excel_file.sheet_names)} sheet(s) in DimManager.xlsx")
 
             for sheet_name in excel_file.sheet_names:
                 try:
@@ -293,7 +293,7 @@ class DatafeedScanner:
 
             # Analyze Excel file if exists
             if files['excel']:
-                print(f"  Found DImmanager.xlsx")
+                print(f"  Found DimManager.xlsx")
                 temp_excel_path = self.download_blob_to_temp(files['excel'])
 
                 if temp_excel_path:
@@ -314,7 +314,7 @@ class DatafeedScanner:
                                 except PermissionError:
                                     print(f"  Warning: Could not delete temp file {temp_excel_path}")
             else:
-                print(f"  ✗ DImmanager.xlsx not found")
+                print(f"  ✗ DimManager.xlsx not found")
 
             # Analyze Parquet files
             if files['parquet']:
