@@ -13,57 +13,22 @@ import time
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
-from azure.identity import InteractiveBrowserCredential
-from azure.storage.blob import BlobServiceClient
-from azure.core.exceptions import ResourceNotFoundError, AzureError
-from config import get_config
+from azure.core.exceptions import AzureError
+from azure_file_manager import AzureFileManager
 
 
-class DatafeedScanner:
-    """Scans Azure Blob Storage for Datafeed folders and extracts metadata."""
+class DatafeedScanner(AzureFileManager):
+    """Scans Azure Blob Storage for Datafeed folders and extracts metadata.
 
-    CONTAINER_NAME = "30-projects"
-    EXCEL_FILENAME = "DimManager.xlsx"
+    Inherits from AzureFileManager to reuse authentication and blob operations.
+    """
+
+    EXCEL_SEARCH_TERM = "dimmanager"  # Search for files containing this term
 
     def __init__(self):
-        """Initialize the Datafeed Scanner with browser authentication."""
-        try:
-            self.config = get_config()
-            print(f"Configuration loaded: {self.config}")
-            print("\nAuthenticating with Azure...")
-            print("Your browser will open for authentication. Please sign in.")
-
-            # Create credential with browser authentication
-            credential_kwargs = {}
-            if self.config.tenant_id:
-                credential_kwargs['tenant_id'] = self.config.tenant_id
-
-            self.credential = InteractiveBrowserCredential(**credential_kwargs)
-
-            # Create BlobServiceClient
-            self.blob_service_client = BlobServiceClient(
-                account_url=self.config.account_url,
-                credential=self.credential
-            )
-
-            # Test connection
-            print("Testing connection...")
-            container_client = self.blob_service_client.get_container_client(self.CONTAINER_NAME)
-            container_client.get_container_properties()
-            print(f"✓ Successfully authenticated and connected to container '{self.CONTAINER_NAME}'!\n")
-
-        except ValueError as e:
-            print(f"Configuration error: {e}")
-            sys.exit(1)
-        except ResourceNotFoundError:
-            print(f"Container '{self.CONTAINER_NAME}' not found.")
-            sys.exit(1)
-        except AzureError as e:
-            print(f"Azure authentication error: {e}")
-            sys.exit(1)
-        except Exception as e:
-            print(f"Unexpected error: {e}")
-            sys.exit(1)
+        """Initialize the Datafeed Scanner by calling parent AzureFileManager."""
+        # Call parent class initialization (handles all authentication)
+        super().__init__()
 
     def scan_for_datafeed_folders(self):
         """Scan all blobs and identify Datafeed folders.
@@ -133,8 +98,8 @@ class DatafeedScanner:
                 # Get filename
                 filename = blob.name.split('/')[-1]
 
-                # Check for DimManager.xlsx
-                if filename.lower() == self.EXCEL_FILENAME.lower():
+                # Check for Excel files containing the search term (e.g., DimManager)
+                if self.EXCEL_SEARCH_TERM in filename.lower() and filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
                     files['excel'] = blob.name
 
                 # Check for parquet files
@@ -195,7 +160,7 @@ class DatafeedScanner:
             # Read Excel file
             excel_file = pd.ExcelFile(excel_path, engine='openpyxl')
 
-            print(f"  ✓ Found {len(excel_file.sheet_names)} sheet(s) in DimManager.xlsx")
+            print(f"  ✓ Found {len(excel_file.sheet_names)} sheet(s) in Excel file")
 
             for sheet_name in excel_file.sheet_names:
                 try:
@@ -293,7 +258,8 @@ class DatafeedScanner:
 
             # Analyze Excel file if exists
             if files['excel']:
-                print(f"  Found DimManager.xlsx")
+                excel_filename = files['excel'].split('/')[-1]
+                print(f"  Found Excel file: {excel_filename}")
                 temp_excel_path = self.download_blob_to_temp(files['excel'])
 
                 if temp_excel_path:
@@ -314,7 +280,7 @@ class DatafeedScanner:
                                 except PermissionError:
                                     print(f"  Warning: Could not delete temp file {temp_excel_path}")
             else:
-                print(f"  ✗ DimManager.xlsx not found")
+                print(f"  ✗ No Excel file containing '{self.EXCEL_SEARCH_TERM}' found")
 
             # Analyze Parquet files
             if files['parquet']:
@@ -354,14 +320,30 @@ class DatafeedScanner:
             print("\nNo data to export.")
             return
 
+        # Ask user for output location (following project guidelines)
+        print("\n" + "=" * 80)
+        print("OUTPUT FILE LOCATION")
+        print("=" * 80)
+        output_dir = input("Enter output directory (press Enter for default 'downloads'): ").strip()
+
+        # Use downloads as default if no input provided
+        if not output_dir:
+            output_dir = 'downloads'
+
+        # Create directory if it doesn't exist
+        os.makedirs(output_dir, exist_ok=True)
+
         # Generate filename with timestamp if not provided
         if not output_filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_filename = f"datafeed_report_{timestamp}.csv"
 
+        # Build full output path
+        output_path = os.path.join(output_dir, output_filename)
+
         try:
-            df.to_csv(output_filename, index=False)
-            print(f"\n✓ Report exported to: {output_filename}")
+            df.to_csv(output_path, index=False)
+            print(f"\n✓ Report exported to: {output_path}")
             print(f"  Total rows: {len(df)}")
             print(f"  Columns: {', '.join(df.columns.tolist())}")
         except Exception as e:
