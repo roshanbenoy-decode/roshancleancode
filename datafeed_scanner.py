@@ -336,7 +336,7 @@ class DatafeedScanner(AzureFileManager):
         # Generate filename with timestamp if not provided
         if not output_filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_filename = f"datafeed_report_{timestamp}.csv"
+            output_filename = f"datafeed_report_.csv"
 
         # Build full output path
         output_path = os.path.join(output_dir, output_filename)

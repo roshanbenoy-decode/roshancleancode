@@ -2,8 +2,12 @@ import pandas as pd
 from datetime import datetime
 import os
 
+# Define Master Paths
+MASTER_PATH_1 = "0000_test_parquet/100007-16_Showcase/Report Documentation/Datafeed"
+MASTER_PATH_2 = "999999_WeitereKDdec/128019_18_Ruegenwalder_Welle4/Report Documentation/Datafeed"
+
 # Read the CSV file
-df = pd.read_csv('downloads/datafeed_report_20251016_112600.csv')
+df = pd.read_csv('downloads/datafeed_report_.csv')
 
 # Ask user where to save the output file
 print("=" * 80)
@@ -81,46 +85,111 @@ for path, row in path_stats.iterrows():
     print(f"  Number of tables: {row['Table_Count']}")
     print(f"  Source types: {row['Source_Types']}")
 
-# Find missing tables for each path
+# Master Path Analysis
 print()
 print("=" * 80)
-print("MISSING TABLES BY PATH")
+print("MASTER PATH COMPARISON")
 print("=" * 80)
 print()
 
-# Get all unique table names across all paths
-all_tables = set(df['Table_Name'].unique())
+# Get tables from each master path
+master_path_1_tables = set(df[df['Path'] == MASTER_PATH_1]['Table_Name'].unique()) if MASTER_PATH_1 in df['Path'].values else set()
+master_path_2_tables = set(df[df['Path'] == MASTER_PATH_2]['Table_Name'].unique()) if MASTER_PATH_2 in df['Path'].values else set()
+
+# Analyze master path consistency
+tables_only_in_path1 = master_path_1_tables - master_path_2_tables
+tables_only_in_path2 = master_path_2_tables - master_path_1_tables
+tables_in_both = master_path_1_tables.intersection(master_path_2_tables)
+
+# Create master table set (union of both master paths)
+master_table_set = master_path_1_tables.union(master_path_2_tables)
+
+print(f"Master Path 1: {MASTER_PATH_1}")
+print(f"  Tables: {len(master_path_1_tables)}")
+print()
+print(f"Master Path 2: {MASTER_PATH_2}")
+print(f"  Tables: {len(master_path_2_tables)}")
+print()
+print(f"Master Table Set (Union): {len(master_table_set)} tables")
+print(f"  Tables in both masters: {len(tables_in_both)}")
+print(f"  Tables only in Master Path 1: {len(tables_only_in_path1)}")
+print(f"  Tables only in Master Path 2: {len(tables_only_in_path2)}")
+print()
+
+if tables_only_in_path1:
+    print("Tables ONLY in Master Path 1:")
+    for table in sorted(tables_only_in_path1):
+        print(f"  - {table}")
+    print()
+
+if tables_only_in_path2:
+    print("Tables ONLY in Master Path 2:")
+    for table in sorted(tables_only_in_path2):
+        print(f"  - {table}")
+    print()
 
 # Create a mapping of table names to their source types
 table_to_source = {}
-for table in all_tables:
+for table in master_table_set:
     sources = df[df['Table_Name'] == table]['Source_Type'].unique()
     table_to_source[table] = ', '.join(sorted(sources))
 
-print(f"Complete set of tables found across all paths: {len(all_tables)}")
-print(f"Tables with sources:")
-for table in sorted(all_tables):
-    print(f"  - {table} ({table_to_source[table]})")
+# Create a mapping of table names to their master path location
+table_to_master_path = {}
+for table in master_table_set:
+    if table in tables_in_both:
+        table_to_master_path[table] = 'Both Masters'
+    elif table in tables_only_in_path1:
+        table_to_master_path[table] = 'Master Path 1 only'
+    else:
+        table_to_master_path[table] = 'Master Path 2 only'
+
+# Find missing tables for each path
+print()
+print("=" * 80)
+print("MISSING & EXTRA TABLES BY PATH")
+print("=" * 80)
 print()
 
-# Check each path for missing tables
+print(f"Master Table Set: {len(master_table_set)} tables")
+print(f"Tables with sources:")
+for table in sorted(master_table_set):
+    print(f"  - {table} ({table_to_source[table]}) [{table_to_master_path[table]}]")
+print()
+
+# Check each path for missing and extra tables
 missing_data = []
 for path, group in df.groupby('Path'):
     path_tables = set(group['Table_Name'].unique())
-    missing_tables = all_tables - path_tables
+    missing_tables = master_table_set - path_tables
+    extra_tables = path_tables - master_table_set
 
-    if missing_tables:
+    if missing_tables or extra_tables:
         print(f"Path: {path}")
-        print(f"  Has {len(path_tables)} tables, Missing {len(missing_tables)} tables:")
-        for table in sorted(missing_tables):
-            print(f"    - {table} ({table_to_source[table]})")
+        print(f"  Has {len(path_tables)} tables")
+
+        if missing_tables:
+            print(f"  Missing {len(missing_tables)} tables from master set:")
+            for table in sorted(missing_tables):
+                master_location = table_to_master_path.get(table, 'Unknown')
+                print(f"    - {table} ({table_to_source[table]}) [Found in: {master_location}]")
+
+        if extra_tables:
+            print(f"  Extra {len(extra_tables)} tables (NOT in master set):")
+            for table in sorted(extra_tables):
+                sources = df[df['Table_Name'] == table]['Source_Type'].unique()
+                source_str = ', '.join(sorted(sources))
+                print(f"    + {table} ({source_str}) [Only in this test path]")
+
         print()
 
         missing_data.append({
             'path': path,
             'has_tables': len(path_tables),
             'missing_tables': sorted(missing_tables),
-            'missing_with_source': [(table, table_to_source[table]) for table in sorted(missing_tables)]
+            'missing_with_source': [(table, table_to_source[table], table_to_master_path.get(table, 'Unknown')) for table in sorted(missing_tables)],
+            'extra_tables': sorted(extra_tables),
+            'extra_with_source': [(table, ', '.join(sorted(df[df['Table_Name'] == table]['Source_Type'].unique()))) for table in sorted(extra_tables)]
         })
 
 # Generate HTML Report
@@ -405,12 +474,12 @@ html_content = f'''
                 <div class="label">Total Rows</div>
             </div>
             <div class="summary-card">
-                <div class="number">{len(all_tables)}</div>
-                <div class="label">Unique Tables</div>
+                <div class="number">{len(master_table_set)}</div>
+                <div class="label">Master Tables</div>
             </div>
             <div class="summary-card">
                 <div class="number">{len(missing_data)}</div>
-                <div class="label">Paths with Missing Tables</div>
+                <div class="label">Paths with Issues</div>
             </div>
         </div>
 
@@ -419,13 +488,78 @@ html_content = f'''
                 <h3>✅ Consistency Check: PASSED</h3>
                 <p>No table name duplicates found. Each table appears only once per path.</p>
             </div>
+        </div>
 
-            <h2 class="section-title">📋 Complete Table List ({len(all_tables)} tables)</h2>
+        <div class="section">
+            <h2 class="section-title">🎯 Master Path Comparison</h2>
+
+            <div class="path-card" style="background: #f0f4ff; border: 2px solid #667eea;">
+                <div class="path-header">
+                    <div class="path-name" style="color: #667eea;">📁 Master Path 1</div>
+                    <div class="badge badge-success">{len(master_path_1_tables)} tables</div>
+                </div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">{MASTER_PATH_1}</p>
+            </div>
+
+            <div class="path-card" style="background: #fff0f5; border: 2px solid #764ba2;">
+                <div class="path-header">
+                    <div class="path-name" style="color: #764ba2;">📁 Master Path 2</div>
+                    <div class="badge badge-success">{len(master_path_2_tables)} tables</div>
+                </div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">{MASTER_PATH_2}</p>
+            </div>
+
+            <div class="status-box" style="background: #e8f5e9; border-left-color: #4caf50;">
+                <h3 style="color: #2e7d32;">Master Set Statistics</h3>
+                <p><strong>Total Master Tables (Union):</strong> {len(master_table_set)}</p>
+                <p><strong>Tables in Both Masters:</strong> {len(tables_in_both)}</p>
+                <p><strong>Only in Master Path 1:</strong> {len(tables_only_in_path1)}</p>
+                <p><strong>Only in Master Path 2:</strong> {len(tables_only_in_path2)}</p>
+            </div>
+'''
+
+# Add tables only in path 1 if any
+if tables_only_in_path1:
+    html_content += '''
+            <div class="status-box" style="background: #e3f2fd; border-left-color: #2196f3;">
+                <h3 style="color: #1565c0;">📋 Tables Only in Master Path 1</h3>
+                <div class="tables-list">
+'''
+    for table in sorted(tables_only_in_path1):
+        html_content += f'                    <div class="table-tag">{table} <span class="source-badge" style="background: #2196f3;">{table_to_source[table]}</span></div>\n'
+
+    html_content += '''
+                </div>
+            </div>
+'''
+
+# Add tables only in path 2 if any
+if tables_only_in_path2:
+    html_content += '''
+            <div class="status-box" style="background: #fce4ec; border-left-color: #e91e63;">
+                <h3 style="color: #c2185b;">📋 Tables Only in Master Path 2</h3>
+                <div class="tables-list">
+'''
+    for table in sorted(tables_only_in_path2):
+        html_content += f'                    <div class="table-tag">{table} <span class="source-badge" style="background: #e91e63;">{table_to_source[table]}</span></div>\n'
+
+    html_content += '''
+                </div>
+            </div>
+'''
+
+html_content += '''
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📋 Master Table List ({len(master_table_set)} tables)</h2>
             <div class="tables-list">
 '''
 
-for table in sorted(all_tables):
+for table in sorted(master_table_set):
     source = table_to_source[table]
+    master_location = table_to_master_path[table]
+
     # Determine badge class based on source
     if 'Excel' in source and 'Parquet' in source:
         badge_class = 'both'
@@ -434,44 +568,89 @@ for table in sorted(all_tables):
     else:
         badge_class = 'parquet'
 
-    html_content += f'                <div class="table-tag">{table} <span class="source-badge {badge_class}">{source}</span></div>\n'
+    # Determine master path badge class
+    if master_location == 'Both Masters':
+        master_badge_class = 'both'
+        master_badge_text = 'Both'
+    elif master_location == 'Master Path 1 only':
+        master_badge_class = 'parquet'  # Blue
+        master_badge_text = 'Path 1'
+    else:
+        master_badge_class = 'excel'  # Orange
+        master_badge_text = 'Path 2'
+
+    html_content += f'                <div class="table-tag">{table} <span class="source-badge {badge_class}">{source}</span> <span class="source-badge {master_badge_class}">{master_badge_text}</span></div>\n'
 
 html_content += '''
             </div>
         </div>
 
         <div class="section">
-            <h2 class="section-title">🔍 Missing Tables by Path</h2>
+            <h2 class="section-title">🔍 Missing & Extra Tables by Path</h2>
 '''
 
-# Add paths with missing tables
+# Add paths with missing or extra tables
 if missing_data:
     for item in missing_data:
         missing_count = len(item['missing_tables'])
+        extra_count = len(item['extra_tables'])
+
+        # Determine badge class based on missing count
         if missing_count >= 10:
             badge_class = 'badge-danger'
         elif missing_count >= 5:
             badge_class = 'badge-warning'
-        else:
+        elif missing_count > 0:
             badge_class = 'badge-warning'
+        else:
+            badge_class = 'badge-success'
 
         html_content += f'''
             <div class="path-card">
                 <div class="path-header">
                     <div class="path-name">{item['path']}</div>
-                    <div class="badge {badge_class}">Missing: {missing_count} table{'s' if missing_count != 1 else ''}</div>
-                    <div class="badge badge-success">Has: {item['has_tables']} tables</div>
+'''
+        if missing_count > 0:
+            html_content += f'                    <div class="badge {badge_class}">Missing: {missing_count} table{"s" if missing_count != 1 else ""}</div>\n'
+        if extra_count > 0:
+            html_content += f'                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: {extra_count} table{"s" if extra_count != 1 else ""}</div>\n'
+
+        html_content += f'                    <div class="badge badge-success">Has: {item["has_tables"]} tables</div>\n'
+        html_content += '''
                 </div>
+'''
+
+        # Add missing tables section if any
+        if missing_count > 0:
+            html_content += '''
                 <div class="missing-tables">
-                    <h4>Missing Tables:</h4>
+                    <h4>Missing Tables (from Master Set):</h4>
                     <div class="missing-list">
 '''
-        for table, source in item['missing_with_source']:
-            html_content += f'                        <div class="missing-item">❌ {table} <small>({source})</small></div>\n'
+            for table, source, master_loc in item['missing_with_source']:
+                html_content += f'                        <div class="missing-item">❌ {table} <small>({source})</small><br><small style="color: #856404;">Found in: {master_loc}</small></div>\n'
 
-        html_content += '''
+            html_content += '''
                     </div>
                 </div>
+'''
+
+        # Add extra tables section if any
+        if extra_count > 0:
+            html_content += '''
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+'''
+            for table, source in item['extra_with_source']:
+                html_content += f'                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ {table} <small>({source})</small><br><small style="color: #1565c0;">Only in this test path</small></div>\n'
+
+            html_content += '''
+                    </div>
+                </div>
+'''
+
+        html_content += '''
             </div>
 '''
 else:
@@ -481,17 +660,18 @@ else:
             </div>
 '''
 
-# Add complete paths section
+# Add complete paths section (paths that have all master tables)
 complete_paths = []
 for path, group in df.groupby('Path'):
     path_tables = set(group['Table_Name'].unique())
-    if len(path_tables) == len(all_tables):
+    # A complete path has all master tables and no extra tables
+    if master_table_set.issubset(path_tables) and len(path_tables - master_table_set) == 0:
         complete_paths.append(path)
 
 if complete_paths:
     html_content += f'''
             <div class="complete-paths">
-                <h3>✨ Complete Paths ({len(complete_paths)}) - All {len(all_tables)} Tables Present</h3>
+                <h3>✨ Complete Paths ({len(complete_paths)}) - All {len(master_table_set)} Master Tables Present, No Extra Tables</h3>
                 <ul>
 '''
     for path in complete_paths:
