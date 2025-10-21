@@ -13,6 +13,8 @@ import time
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils import range_boundaries
 from azure.core.exceptions import AzureError
 from azure_file_manager import AzureFileManager
 
@@ -144,44 +146,73 @@ class DatafeedScanner(AzureFileManager):
             print(f"  ✗ Error downloading {blob_name}: {e}")
             return None
 
-    def analyze_excel_file(self, excel_path, datafeed_path):
-        """Analyze Excel file and extract sheet names and columns.
+    def analyze_excel_file_with_tables(self, excel_path, datafeed_path):
+        """Analyze Excel file and extract named tables with columns (Option B format).
 
         Args:
             excel_path: Path to the downloaded Excel file
             datafeed_path: Path to the Datafeed folder (for reporting)
 
         Returns:
-            list: List of dictionaries with metadata
+            list: List of dictionaries with metadata (one row per column)
         """
         results = []
 
         try:
-            # Read Excel file
-            excel_file = pd.ExcelFile(excel_path, engine='openpyxl')
+            # Load workbook with openpyxl
+            wb = load_workbook(excel_path, data_only=True)
 
-            print(f"  ✓ Found {len(excel_file.sheet_names)} sheet(s) in Excel file")
+            print(f"  ✓ Found {len(wb.sheetnames)} sheet(s) in Excel file")
 
-            for sheet_name in excel_file.sheet_names:
-                try:
-                    # Read sheet
-                    df = pd.read_excel(excel_file, sheet_name=sheet_name)
+            total_tables = 0
+            total_columns = 0
 
-                    # Get column names
-                    columns = ','.join(df.columns.tolist())
+            # Iterate through all sheets
+            for sheet_name in wb.sheetnames:
+                ws = wb[sheet_name]
 
-                    results.append({
-                        'Path': datafeed_path.rstrip('/'),
-                        'Source_Type': 'Excel',
-                        'Table_Name': sheet_name,
-                        'Columns': columns
-                    })
+                # Check if sheet has named tables
+                if hasattr(ws, 'tables') and ws.tables:
+                    # Sheet has named tables
+                    for table_name, table_ref in ws.tables.items():
+                        total_tables += 1
 
-                except Exception as e:
-                    print(f"  ✗ Error reading sheet '{sheet_name}': {e}")
+                        try:
+                            # table_ref is already a string (e.g., "A1:D10")
+                            # Parse the table range to get cell boundaries
+                            min_col, min_row, max_col, max_row = range_boundaries(table_ref)
 
-            # Close the Excel file explicitly
-            excel_file.close()
+                            # Extract column headers (first row of the table)
+                            column_headers = []
+                            for col in range(min_col, max_col + 1):
+                                cell_value = ws.cell(row=min_row, column=col).value
+                                if cell_value:
+                                    column_headers.append(cell_value)
+
+                            # Create one row per column (Option B)
+                            for column_name in column_headers:
+                                total_columns += 1
+                                results.append({
+                                    'Path': datafeed_path.rstrip('/'),
+                                    'Source_Type': 'Excel',
+                                    'Sheet_Name': sheet_name,
+                                    'Table_Name': table_name,
+                                    'Column_Name': str(column_name)
+                                })
+
+                        except Exception as e:
+                            print(f"  ✗ Error reading table '{table_name}' in sheet '{sheet_name}': {e}")
+
+                else:
+                    # No named tables found in this sheet
+                    print(f"  ⚠ Sheet '{sheet_name}' has no named Excel tables")
+
+            wb.close()
+
+            if total_tables > 0:
+                print(f"  ✓ Found {total_tables} named table(s) with {total_columns} total columns")
+            else:
+                print(f"  ⚠ No named Excel tables found in file")
 
         except Exception as e:
             print(f"  ✗ Error analyzing Excel file: {e}")
@@ -189,37 +220,39 @@ class DatafeedScanner(AzureFileManager):
         return results
 
     def analyze_parquet_file(self, parquet_blob_name, datafeed_path):
-        """Analyze Parquet file and extract column names.
+        """Analyze Parquet file and extract columns (Option B format).
 
         Args:
             parquet_blob_name: Full blob path to the parquet file
             datafeed_path: Path to the Datafeed folder (for reporting)
 
         Returns:
-            dict: Dictionary with metadata, or None if failed
+            list: List of dictionaries with metadata (one row per column)
         """
+        results = []
+
         try:
             # Download parquet file
             temp_path = self.download_blob_to_temp(parquet_blob_name)
             if not temp_path:
-                return None
+                return results
 
             try:
                 # Read parquet file
                 df = pd.read_parquet(temp_path, engine='pyarrow')
 
-                # Get column names
-                columns = ','.join(df.columns.tolist())
-
                 # Get filename
                 filename = parquet_blob_name.split('/')[-1]
 
-                return {
-                    'Path': datafeed_path.rstrip('/'),
-                    'Source_Type': 'Parquet',
-                    'Table_Name': filename,
-                    'Columns': columns
-                }
+                # Create one row per column (Option B format)
+                for column_name in df.columns:
+                    results.append({
+                        'Path': datafeed_path.rstrip('/'),
+                        'Source_Type': 'Parquet',
+                        'Sheet_Name': '',  # N/A for parquet
+                        'Table_Name': filename,
+                        'Column_Name': str(column_name)
+                    })
 
             finally:
                 # Clean up temp file
@@ -228,7 +261,8 @@ class DatafeedScanner(AzureFileManager):
 
         except Exception as e:
             print(f"  ✗ Error analyzing parquet file {parquet_blob_name}: {e}")
-            return None
+
+        return results
 
     def generate_report(self):
         """Generate comprehensive report of all Datafeed folders.
@@ -264,7 +298,7 @@ class DatafeedScanner(AzureFileManager):
 
                 if temp_excel_path:
                     try:
-                        excel_results = self.analyze_excel_file(temp_excel_path, datafeed_path)
+                        excel_results = self.analyze_excel_file_with_tables(temp_excel_path, datafeed_path)
                         all_results.extend(excel_results)
                     finally:
                         # Clean up temp file - wait a bit for Windows to release file handle
@@ -290,16 +324,16 @@ class DatafeedScanner(AzureFileManager):
                     filename = parquet_blob.split('/')[-1]
                     print(f"    Analyzing: {filename}")
 
-                    result = self.analyze_parquet_file(parquet_blob, datafeed_path)
-                    if result:
-                        all_results.append(result)
-                        print(f"      ✓ Extracted {len(result['Columns'].split(','))} columns")
+                    results = self.analyze_parquet_file(parquet_blob, datafeed_path)
+                    if results:
+                        all_results.extend(results)
+                        print(f"      ✓ Extracted {len(results)} columns")
             else:
                 print(f"  No parquet files found")
 
         print("\n" + "=" * 80)
         print(f"✓ Scan complete! Processed {len(datafeed_folders)} Datafeed folder(s)")
-        print(f"✓ Extracted metadata from {len(all_results)} file(s)/sheet(s)")
+        print(f"✓ Extracted {len(all_results)} column entries (one row per column)")
         print("=" * 80)
 
         # Create DataFrame
@@ -377,10 +411,27 @@ def main():
         print("\n" + "=" * 80)
         print("SUMMARY STATISTICS")
         print("=" * 80)
-        print(f"Total entries: {len(df)}")
+        print(f"Total column entries: {len(df)}")
         print(f"Unique Datafeed paths: {df['Path'].nunique()}")
-        print(f"Excel sheets: {len(df[df['Source_Type'] == 'Excel'])}")
-        print(f"Parquet files: {len(df[df['Source_Type'] == 'Parquet'])}")
+
+        # Excel statistics
+        excel_entries = df[df['Source_Type'] == 'Excel']
+        if not excel_entries.empty:
+            print(f"Excel named tables: {excel_entries['Table_Name'].nunique()}")
+            print(f"Excel columns: {len(excel_entries)}")
+        else:
+            print(f"Excel named tables: 0")
+            print(f"Excel columns: 0")
+
+        # Parquet statistics
+        parquet_entries = df[df['Source_Type'] == 'Parquet']
+        if not parquet_entries.empty:
+            print(f"Parquet files: {parquet_entries['Table_Name'].nunique()}")
+            print(f"Parquet columns: {len(parquet_entries)}")
+        else:
+            print(f"Parquet files: 0")
+            print(f"Parquet columns: 0")
+
         print("=" * 80)
 
         # Export to CSV

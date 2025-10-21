@@ -1,0 +1,644 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Table Consistency Report</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+
+        .summary-card {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+
+        .summary-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .summary-card .number {
+            font-size: 3em;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .summary-card .label {
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .section {
+            padding: 30px;
+        }
+
+        .section-title {
+            font-size: 1.8em;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .status-box {
+            background: #d4edda;
+            border-left: 5px solid #28a745;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+
+        .status-box.error {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .status-box h3 {
+            color: #155724;
+            margin-bottom: 10px;
+        }
+
+        .status-box.error h3 {
+            color: #721c24;
+        }
+
+        .tables-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .table-tag {
+            background: #e9ecef;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            color: #495057;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .source-badge {
+            background: #667eea;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.85em;
+            font-weight: 600;
+        }
+
+        .source-badge.excel {
+            background: #28a745;
+        }
+
+        .source-badge.parquet {
+            background: #007bff;
+        }
+
+        .source-badge.both {
+            background: #6f42c1;
+        }
+
+        .path-card {
+            background: white;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 25px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .path-card:hover {
+            border-color: #667eea;
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.2);
+        }
+
+        .path-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .path-name {
+            font-size: 1.1em;
+            color: #333;
+            font-weight: 600;
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .badge {
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .badge-success {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .badge-warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .badge-danger {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .missing-tables {
+            margin-top: 15px;
+        }
+
+        .missing-tables h4 {
+            color: #dc3545;
+            margin-bottom: 10px;
+        }
+
+        .missing-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 8px;
+        }
+
+        .missing-item {
+            background: #fff3cd;
+            padding: 8px 12px;
+            border-radius: 5px;
+            border-left: 3px solid #ffc107;
+            font-size: 0.9em;
+        }
+
+        .complete-paths {
+            background: #d1ecf1;
+            border-left: 5px solid #17a2b8;
+            padding: 20px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+
+        .complete-paths h3 {
+            color: #0c5460;
+            margin-bottom: 15px;
+        }
+
+        .complete-paths ul {
+            list-style: none;
+        }
+
+        .complete-paths li {
+            padding: 8px 0;
+            border-bottom: 1px solid #bee5eb;
+        }
+
+        .complete-paths li:last-child {
+            border-bottom: none;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            color: #666;
+            border-top: 1px solid #e9ecef;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Table Consistency Report</h1>
+            <p>Generated on October 20, 2025 at 04:58 PM</p>
+        </div>
+
+        <div class="summary">
+            <div class="summary-card">
+                <div class="number">18</div>
+                <div class="label">Total Paths</div>
+            </div>
+            <div class="summary-card">
+                <div class="number">5482</div>
+                <div class="label">Total Rows</div>
+            </div>
+            <div class="summary-card">
+                <div class="number">27</div>
+                <div class="label">Master Tables</div>
+            </div>
+            <div class="summary-card">
+                <div class="number">9</div>
+                <div class="label">Paths with Issues</div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="status-box">
+                <h3>✅ Consistency Check: PASSED</h3>
+                <p>No table name duplicates found. Each table appears only once per path.</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🎯 Master Path Comparison</h2>
+
+            <div class="path-card" style="background: #f0f4ff; border: 2px solid #667eea;">
+                <div class="path-header">
+                    <div class="path-name" style="color: #667eea;">📁 Master Path 1</div>
+                    <div class="badge badge-success">27 tables</div>
+                </div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">0000_test_parquet/100007-16_Showcase/Report Documentation/Datafeed</p>
+            </div>
+
+            <div class="path-card" style="background: #fff0f5; border: 2px solid #764ba2;">
+                <div class="path-header">
+                    <div class="path-name" style="color: #764ba2;">📁 Master Path 2</div>
+                    <div class="badge badge-success">27 tables</div>
+                </div>
+                <p style="font-size: 0.9em; color: #666; margin-top: 10px;">999999_WeitereKDdec/128019_18_Ruegenwalder_Welle4/Report Documentation/Datafeed</p>
+            </div>
+
+            <div class="status-box" style="background: #e8f5e9; border-left-color: #4caf50;">
+                <h3 style="color: #2e7d32;">Master Set Statistics</h3>
+                <p><strong>Total Master Tables (Union):</strong> 27</p>
+                <p><strong>Tables in Both Masters:</strong> 27</p>
+                <p><strong>Only in Master Path 1:</strong> 0</p>
+                <p><strong>Only in Master Path 2:</strong> 0</p>
+            </div>
+
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">📋 Master Table List ({len(master_table_set)} tables)</h2>
+            <div class="tables-list">
+                <div class="table-tag">Allocation <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dashboard_Info <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Answer <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Breakout <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Factor <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_File <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Item <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Leg <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Logo <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Question <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Sheet <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dim_Study <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Answer <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Breakout <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Item <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Leg <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Logo <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Dimhelper_Question <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Images <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Images_exploded <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">KPIs_Explicit.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">KPIs_Implicit.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">List_Aggregation <span class="source-badge excel">Excel</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Overall_Correlations.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Reduced_Correlations.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Translations_Item.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+                <div class="table-tag">Translations_Logo.parquet <span class="source-badge parquet">Parquet</span> <span class="source-badge both">Both</span></div>
+
+            </div>
+        </div>
+
+        <div class="section">
+            <h2 class="section-title">🔍 Missing & Extra Tables by Path</h2>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">0000_test_parquet/SeparateCategory/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 8 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 20 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Answer <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Breakout <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Item <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Leg <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Logo <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Question <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">0000_test_parquet/testrosh/112040-4_BoltonGroup_FR_BGO_Carolin_HomeCare/Report Documentation/Datafeed</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 28 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">0000_test_parquet/testrosh/128019-15_Ruegenwalder_Welle3/Report Documentation/Datafeed</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 28 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">112040_BoltonGroup/112040-3_BoltonGroup_IT_BGO_HomeCare-WC NET/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 9 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 19 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Answer <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Breakout <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Item <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Leg <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Logo <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Question <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Images <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">118014_Hassia/118014-2_Hassia_DE_Limonaden/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 9 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 19 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Answer <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Breakout <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Item <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Leg <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Logo <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Question <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Images <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">1414_Henkel/1414-156_Henkel_DE_Somat/Report Documentation/Datafeed</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 28 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">1414_Henkel/1414-497_Henkel_US_BrandStretch_All/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 9 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 19 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Answer <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Breakout <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Item <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Leg <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Logo <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Question <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Images <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">Eigenstudien_Showcases/100007-16002_DE_US_Eigenstudie_WTP-ShowCase/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 9 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 19 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Answer <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Breakout <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Item <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Leg <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Logo <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Dimhelper_Question <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ Images <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="path-card">
+                <div class="path-header">
+                    <div class="path-name">Eigenstudien_Showcases/100008-28002_US_StratFit_Showcase-Chocolate_NEU/Report Documentation/Datafeed</div>
+                    <div class="badge badge-warning">Missing: 2 tables</div>
+                    <div class="badge" style="background: #e3f2fd; color: #1565c0;">Extra: 1 table</div>
+                    <div class="badge badge-success">Has: 26 tables</div>
+
+                </div>
+
+                <div class="missing-tables">
+                    <h4>Missing Tables (from Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item">❌ Allocation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+                        <div class="missing-item">❌ List_Aggregation <small>(Excel)</small><br><small style="color: #856404;">Found in: Both Masters</small></div>
+
+                    </div>
+                </div>
+
+                <div class="missing-tables">
+                    <h4 style="color: #1565c0;">Extra Tables (NOT in Master Set):</h4>
+                    <div class="missing-list">
+                        <div class="missing-item" style="background: #e3f2fd; border-left-color: #2196f3;">➕ List_Aggregations <small>(Excel)</small><br><small style="color: #1565c0;">Only in this test path</small></div>
+
+                    </div>
+                </div>
+
+            </div>
+
+            <div class="complete-paths">
+                <h3>✨ Complete Paths (9) - All 27 Master Tables Present, No Extra Tables</h3>
+                <ul>
+                    <li>✅ 0000_test_parquet/100007-16_Showcase/Report Documentation/Datafeed</li>
+                    <li>✅ 0000_test_parquet/128019-99_Ruegenwalder_v3/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019-12_Ruegenwalder_Welle2/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019-15_Ruegenwalder_Welle3/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019-19_Ruegenwalder_Kategorie_Welle_2/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019-1_Ruegenwalder_Kategorie_Welle/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019-6_Ruegenwalder_Welle1/Report Documentation/Datafeed</li>
+                    <li>✅ 999999_WeitereKDdec/128019_18_Ruegenwalder_Welle4/Report Documentation/Datafeed</li>
+                    <li>✅ Eigenstudien_Showcases/100007-16_Showcase_v2/Report Documentation/Datafeed</li>
+
+                </ul>
+            </div>
+
+        </div>
+
+        <div class="footer">
+            <p>Report generated from: datafeed_report_20251016_101700.csv</p>
+            <p>Total records analyzed: 5482</p>
+        </div>
+    </div>
+</body>
+</html>
