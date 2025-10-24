@@ -1,0 +1,252 @@
+/* Custom styles for Datafeed Scanner Web App */
+
+/* Body and Layout */
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background-color: #f8f9fa;
+}
+
+main {
+    flex: 1;
+}
+
+/* Navbar customization */
+.navbar-brand {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+/* Card enhancements */
+.card {
+    border-radius: 0.5rem;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Statistics cards on results page */
+.card.bg-primary,
+.card.bg-info,
+.card.bg-success,
+.card.bg-warning {
+    border: none;
+}
+
+.card.bg-primary .card-body,
+.card.bg-info .card-body,
+.card.bg-success .card-body,
+.card.bg-warning .card-body {
+    padding: 1.5rem;
+}
+
+.card.bg-primary .card-title,
+.card.bg-info .card-title,
+.card.bg-success .card-title,
+.card.bg-warning .card-title {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.card.bg-primary .card-subtitle,
+.card.bg-info .card-subtitle,
+.card.bg-success .card-subtitle,
+.card.bg-warning .card-subtitle {
+    font-size: 0.875rem;
+    opacity: 0.9;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Button enhancements */
+.btn {
+    border-radius: 0.375rem;
+    font-weight: 500;
+    transition: all 0.2s;
+}
+
+.btn-lg {
+    padding: 0.75rem 1.5rem;
+    font-size: 1.125rem;
+}
+
+.btn-primary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+.btn-success:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(25, 135, 84, 0.3);
+}
+
+/* DataTables customization */
+.dataTables_wrapper {
+    padding: 0;
+}
+
+.dataTables_filter input {
+    border-radius: 0.375rem;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ced4da;
+    margin-left: 0.5rem;
+}
+
+.dataTables_length select {
+    border-radius: 0.375rem;
+    padding: 0.375rem 2rem 0.375rem 0.75rem;
+    border: 1px solid #ced4da;
+    margin: 0 0.5rem;
+}
+
+table.dataTable thead th {
+    font-weight: 600;
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+}
+
+table.dataTable tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+.dataTables_info {
+    padding-top: 1rem;
+    font-size: 0.875rem;
+    color: #6c757d;
+}
+
+.dataTables_paginate {
+    padding-top: 1rem;
+}
+
+.page-link {
+    border-radius: 0.375rem;
+    margin: 0 0.125rem;
+}
+
+/* Table responsive improvements */
+.table-responsive {
+    border-radius: 0.375rem;
+}
+
+/* Loading spinner */
+.spinner-border {
+    animation-duration: 0.75s;
+}
+
+/* Footer */
+.footer {
+    margin-top: auto;
+    padding: 1.5rem 0;
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+}
+
+/* Alert customization */
+.alert {
+    border-radius: 0.375rem;
+    border: none;
+}
+
+.alert-info {
+    background-color: #cfe2ff;
+    color: #084298;
+}
+
+.alert-success {
+    background-color: #d1e7dd;
+    color: #0f5132;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    color: #842029;
+}
+
+/* Icon alignment */
+.bi {
+    vertical-align: -0.125em;
+}
+
+/* Code snippets */
+code {
+    background-color: #f8f9fa;
+    padding: 0.2rem 0.4rem;
+    border-radius: 0.25rem;
+    font-size: 0.875em;
+    color: #d63384;
+}
+
+/* Dropdown menu */
+.dropdown-menu {
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    transition: background-color 0.2s;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+.dropdown-item-text {
+    padding: 0.5rem 1rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .navbar-brand {
+        font-size: 1rem;
+    }
+
+    .card.bg-primary .card-title,
+    .card.bg-info .card-title,
+    .card.bg-success .card-title,
+    .card.bg-warning .card-title {
+        font-size: 1.5rem;
+    }
+
+    .card.bg-primary .card-subtitle,
+    .card.bg-info .card-subtitle,
+    .card.bg-success .card-subtitle,
+    .card.bg-warning .card-subtitle {
+        font-size: 0.75rem;
+    }
+}
+
+/* SVG icons in cards */
+.card svg {
+    margin-bottom: 0.5rem;
+}
+
+/* Modal customization */
+.modal-content {
+    border-radius: 0.5rem;
+    border: none;
+}
+
+.modal-body {
+    padding: 2rem;
+}
+
+/* Success/Error page icons */
+.text-success,
+.text-danger,
+.text-info {
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+}
+
+/* Smooth transitions */
+* {
+    transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out,
+                border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}

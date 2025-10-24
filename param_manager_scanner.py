@@ -1,8 +1,8 @@
 """
-Datafeed Scanner - Scan Azure Blob Storage for Datafeed folders and extract metadata.
+ParamManager Scanner - Scan Azure Blob Storage for ParamManager files in Datafeed folders.
 
 This script searches through the '30-projects' container for folders named 'Datafeed',
-analyzes Excel files (DimManager.xlsx) and Parquet files within them, and exports
+analyzes Excel files (ParamManager.xlsx) and Parquet files within them, and exports
 metadata (table names and column names) to a CSV report.
 """
 
@@ -19,23 +19,18 @@ from azure.core.exceptions import AzureError
 from azure_file_manager import AzureFileManager
 
 
-class DatafeedScanner(AzureFileManager):
-    """Scans Azure Blob Storage for Datafeed folders and extracts metadata.
+class ParamManagerScanner(AzureFileManager):
+    """Scans Azure Blob Storage for ParamManager files in Datafeed folders.
 
     Inherits from AzureFileManager to reuse authentication and blob operations.
     """
 
-    EXCEL_SEARCH_TERM = "Dimmanager"  # Search for files containing this term
+    EXCEL_SEARCH_TERM = "parametermanager"  # Search for files containing this term (lowercase for comparison)
 
-    def __init__(self, credential=None):
-        """Initialize the Datafeed Scanner by calling parent AzureFileManager.
-
-        Args:
-            credential: Optional Azure credential (for web app use). If not provided,
-                       uses InteractiveBrowserCredential (for CLI use).
-        """
+    def __init__(self):
+        """Initialize the ParamManager Scanner by calling parent AzureFileManager."""
         # Call parent class initialization (handles all authentication)
-        super().__init__(credential=credential)
+        super().__init__()
 
     def scan_for_datafeed_folders(self):
         """Scan all blobs and identify Datafeed folders.
@@ -80,22 +75,17 @@ class DatafeedScanner(AzureFileManager):
             return []
 
     def get_files_in_datafeed(self, datafeed_path):
-        """Get list of files in a specific Datafeed folder.
+        """Get ParamManager Excel file in a specific Datafeed folder.
 
         Args:
             datafeed_path: Path to the Datafeed folder
 
         Returns:
-            dict: Dictionary with 'excel' and 'parquet' file lists
+            str: Path to Excel file, or None if not found
         """
         try:
             container_client = self.blob_service_client.get_container_client(self.CONTAINER_NAME)
             blobs = container_client.list_blobs(name_starts_with=datafeed_path)
-
-            files = {
-                'excel': None,
-                'parquet': []
-            }
 
             for blob in blobs:
                 # Skip folder markers
@@ -105,19 +95,15 @@ class DatafeedScanner(AzureFileManager):
                 # Get filename
                 filename = blob.name.split('/')[-1]
 
-                # Check for Excel files containing the search term (e.g., DimManager)
+                # Check for Excel files containing the search term (e.g., ParameterManager)
                 if self.EXCEL_SEARCH_TERM in filename.lower() and filename.lower().endswith(('.xlsx', '.xlsm', '.xls')):
-                    files['excel'] = blob.name
+                    return blob.name
 
-                # Check for parquet files
-                elif filename.lower().endswith('.parquet'):
-                    files['parquet'].append(blob.name)
-
-            return files
+            return None
 
         except AzureError as e:
             print(f"Error listing files in {datafeed_path}: {e}")
-            return {'excel': None, 'parquet': []}
+            return None
 
     def download_blob_to_temp(self, blob_name):
         """Download a blob to a temporary file.
@@ -224,53 +210,9 @@ class DatafeedScanner(AzureFileManager):
 
         return results
 
-    def analyze_parquet_file(self, parquet_blob_name, datafeed_path):
-        """Analyze Parquet file and extract columns (Option B format).
-
-        Args:
-            parquet_blob_name: Full blob path to the parquet file
-            datafeed_path: Path to the Datafeed folder (for reporting)
-
-        Returns:
-            list: List of dictionaries with metadata (one row per column)
-        """
-        results = []
-
-        try:
-            # Download parquet file
-            temp_path = self.download_blob_to_temp(parquet_blob_name)
-            if not temp_path:
-                return results
-
-            try:
-                # Read parquet file
-                df = pd.read_parquet(temp_path, engine='pyarrow')
-
-                # Get filename
-                filename = parquet_blob_name.split('/')[-1]
-
-                # Create one row per column (Option B format)
-                for column_name in df.columns:
-                    results.append({
-                        'Path': datafeed_path.rstrip('/'),
-                        'Source_Type': 'Parquet',
-                        'Sheet_Name': '',  # N/A for parquet
-                        'Table_Name': filename,
-                        'Column_Name': str(column_name)
-                    })
-
-            finally:
-                # Clean up temp file
-                if os.path.exists(temp_path):
-                    os.unlink(temp_path)
-
-        except Exception as e:
-            print(f"  ✗ Error analyzing parquet file {parquet_blob_name}: {e}")
-
-        return results
 
     def generate_report(self):
-        """Generate comprehensive report of all Datafeed folders.
+        """Generate comprehensive report of all ParamManager files in Datafeed folders.
 
         Returns:
             pd.DataFrame: DataFrame with all metadata
@@ -285,21 +227,21 @@ class DatafeedScanner(AzureFileManager):
         # Collect all metadata
         all_results = []
 
-        print("Analyzing Datafeed folders...")
+        print("Analyzing Datafeed folders for ParameterManager files...")
         print("=" * 80)
 
         for idx, datafeed_path in enumerate(datafeed_folders, 1):
             print(f"\n[{idx}/{len(datafeed_folders)}] Processing: {datafeed_path}")
             print("-" * 80)
 
-            # Get files in this Datafeed folder
-            files = self.get_files_in_datafeed(datafeed_path)
+            # Get ParamManager Excel file in this Datafeed folder
+            excel_file = self.get_files_in_datafeed(datafeed_path)
 
             # Analyze Excel file if exists
-            if files['excel']:
-                excel_filename = files['excel'].split('/')[-1]
-                print(f"  Found Excel file: {excel_filename}")
-                temp_excel_path = self.download_blob_to_temp(files['excel'])
+            if excel_file:
+                excel_filename = excel_file.split('/')[-1]
+                print(f"  Found ParameterManager Excel file: {excel_filename}")
+                temp_excel_path = self.download_blob_to_temp(excel_file)
 
                 if temp_excel_path:
                     try:
@@ -320,21 +262,6 @@ class DatafeedScanner(AzureFileManager):
                                     print(f"  Warning: Could not delete temp file {temp_excel_path}")
             else:
                 print(f"  ✗ No Excel file containing '{self.EXCEL_SEARCH_TERM}' found")
-
-            # Analyze Parquet files
-            if files['parquet']:
-                print(f"  Found {len(files['parquet'])} parquet file(s)")
-
-                for parquet_blob in files['parquet']:
-                    filename = parquet_blob.split('/')[-1]
-                    print(f"    Analyzing: {filename}")
-
-                    results = self.analyze_parquet_file(parquet_blob, datafeed_path)
-                    if results:
-                        all_results.extend(results)
-                        print(f"      ✓ Extracted {len(results)} columns")
-            else:
-                print(f"  No parquet files found")
 
         print("\n" + "=" * 80)
         print(f"✓ Scan complete! Processed {len(datafeed_folders)} Datafeed folder(s)")
@@ -375,7 +302,7 @@ class DatafeedScanner(AzureFileManager):
         # Generate filename with timestamp if not provided
         if not output_filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_filename = f"datafeed_report_.csv"
+            output_filename = f"parammanager_report_{timestamp}.csv"
 
         # Build full output path
         output_path = os.path.join(output_dir, output_filename)
@@ -392,13 +319,14 @@ class DatafeedScanner(AzureFileManager):
 def main():
     """Main function."""
     print("=" * 80)
-    print("Datafeed Scanner - Azure Blob Storage")
+    print("ParameterManager Scanner - Azure Blob Storage")
     print("Container: 30-projects")
+    print("Searching for: ParameterManager files in Datafeed folders")
     print("=" * 80)
     print()
 
     # Initialize scanner
-    scanner = DatafeedScanner()
+    scanner = ParamManagerScanner()
 
     # Generate report
     df = scanner.generate_report()
@@ -418,31 +346,14 @@ def main():
         print("=" * 80)
         print(f"Total column entries: {len(df)}")
         print(f"Unique Datafeed paths: {df['Path'].nunique()}")
-
-        # Excel statistics
-        excel_entries = df[df['Source_Type'] == 'Excel']
-        if not excel_entries.empty:
-            print(f"Excel named tables: {excel_entries['Table_Name'].nunique()}")
-            print(f"Excel columns: {len(excel_entries)}")
-        else:
-            print(f"Excel named tables: 0")
-            print(f"Excel columns: 0")
-
-        # Parquet statistics
-        parquet_entries = df[df['Source_Type'] == 'Parquet']
-        if not parquet_entries.empty:
-            print(f"Parquet files: {parquet_entries['Table_Name'].nunique()}")
-            print(f"Parquet columns: {len(parquet_entries)}")
-        else:
-            print(f"Parquet files: 0")
-            print(f"Parquet columns: 0")
-
+        print(f"ParameterManager Excel named tables: {df['Table_Name'].nunique()}")
+        print(f"Total columns extracted: {len(df)}")
         print("=" * 80)
 
         # Export to CSV
         scanner.export_to_csv(df)
     else:
-        print("\nNo data found to report.")
+        print("\nNo ParameterManager data found to report.")
 
 
 if __name__ == "__main__":

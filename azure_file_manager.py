@@ -22,20 +22,32 @@ class AzureFileManager:
 
     CONTAINER_NAME = "30-projects"  # Fixed container name
 
-    def __init__(self):
-        """Initialize the Azure File Manager with browser authentication."""
+    def __init__(self, credential=None):
+        """Initialize the Azure File Manager with browser authentication or provided credential.
+
+        Args:
+            credential: Optional Azure credential (for web app use). If not provided,
+                       uses InteractiveBrowserCredential (for CLI use).
+        """
         try:
             self.config = get_config()
-            print(f"Configuration loaded: {self.config}")
-            print("\nAuthenticating with Azure...")
-            print("Your browser will open for authentication. Please sign in.")
 
-            # Create credential with browser authentication
-            credential_kwargs = {}
-            if self.config.tenant_id:
-                credential_kwargs['tenant_id'] = self.config.tenant_id
+            # If credential is provided (web app), use it directly
+            if credential:
+                print("Using provided user credential for authentication.")
+                self.credential = credential
+            else:
+                # CLI mode: Use browser authentication
+                print(f"Configuration loaded: {self.config}")
+                print("\nAuthenticating with Azure...")
+                print("Your browser will open for authentication. Please sign in.")
 
-            self.credential = InteractiveBrowserCredential(**credential_kwargs)
+                # Create credential with browser authentication
+                credential_kwargs = {}
+                if self.config.tenant_id:
+                    credential_kwargs['tenant_id'] = self.config.tenant_id
+
+                self.credential = InteractiveBrowserCredential(**credential_kwargs)
 
             # Create BlobServiceClient
             self.blob_service_client = BlobServiceClient(

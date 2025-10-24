@@ -8,6 +8,7 @@ MASTER_PATH_2 = "999999_WeitereKDdec/128019_18_Ruegenwalder_Welle4/Report Docume
 
 # Read the CSV file
 df = pd.read_csv('downloads/datafeed_report_.csv')
+#df = pd.read_csv('downloads/parammanager_report_20251021_171403.csv')
 
 # Ask user where to save the output file
 print("=" * 80)
